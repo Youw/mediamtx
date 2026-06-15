@@ -135,9 +135,17 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 		nc = l
 	}
 
+	reorderQueueSize := params.Conf.RTPReorderQueueSize
+
+	// 'unix+rtp' is deprecated and intentionally left unchanged: never reorder.
+	if u.Scheme == "unix+rtp" {
+		disabled := uint(0)
+		reorderQueueSize = &disabled
+	}
+
 	readerErr := make(chan error)
 	go func() {
-		readerErr <- s.runReader(&desc, nc)
+		readerErr <- s.runReader(&desc, nc, reorderQueueSize)
 	}()
 
 	for {
@@ -156,7 +164,7 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 	}
 }
 
-func (s *Source) runReader(desc *description.Session, nc net.Conn) error {
+func (s *Source) runReader(desc *description.Session, nc net.Conn, reorderQueueSize *uint) error {
 	packetsLost := &counterdumper.Dumper{
 		OnReport: func(val uint64) {
 			s.Log(logger.Warn, "%d RTP %s lost",
@@ -193,6 +201,12 @@ func (s *Source) runReader(desc *description.Session, nc net.Conn) error {
 	mediasByPayloadType := make(map[uint8]*rtpMedia)
 	formatsByPayloadType := make(map[uint8]*rtpFormat)
 
+	defer func() {
+		for _, forma := range formatsByPayloadType {
+			forma.close()
+		}
+	}()
+
 	for _, descMedia := range desc.Medias {
 		rtpMedia := &rtpMedia{
 			desc: descMedia,
@@ -202,7 +216,10 @@ func (s *Source) runReader(desc *description.Session, nc net.Conn) error {
 			rtpFormat := &rtpFormat{
 				desc: descFormat,
 			}
-			rtpFormat.initialize()
+			err := rtpFormat.initialize(reorderQueueSize)
+			if err != nil {
+				return err
+			}
 
 			mediasByPayloadType[descFormat.PayloadType()] = rtpMedia
 			formatsByPayloadType[descFormat.PayloadType()] = rtpFormat

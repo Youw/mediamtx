@@ -386,6 +386,24 @@ func TestConfErrors(t *testing.T) {
 			`invalid 'readRTPassphrase': must be between 10 and 79 characters`,
 		},
 		{
+			"invalid rtpReorderQueueSize udp",
+			"paths:\n" +
+				"  mypath:\n" +
+				"    source: udp+rtp://0.0.0.0:5000\n" +
+				"    rtpSDP: abc\n" +
+				"    rtpReorderQueueSize: 100\n",
+			"'rtpReorderQueueSize' must be 0 or a power of two not greater than 16384",
+		},
+		{
+			"invalid rtpReorderQueueSize unixgram",
+			"paths:\n" +
+				"  mypath:\n" +
+				"    source: unixgram+rtp:///tmp/test.sock\n" +
+				"    rtpSDP: abc\n" +
+				"    rtpReorderQueueSize: 100\n",
+			"'rtpReorderQueueSize' must be 0 or a power of two not greater than 16384",
+		},
+		{
 			"all_others aliases",
 			"paths:\n" +
 				"  all:\n" +
