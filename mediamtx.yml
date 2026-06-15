@@ -602,6 +602,13 @@ pathDefaults:
 
   # session description protocol (SDP) of the RTP stream.
   rtpSDP:
+  # size of the buffer (in packets) used to reorder incoming RTP packets that
+  # arrive out of order, which is common when receiving over UDP.
+  # the value must be a power of two.
+  # if unset, the default size (64) is used.
+  # set it explicitly to 0 to disable reordering.
+  # this has no effect on the deprecated 'unix+rtp' source.
+  rtpReorderQueueSize:
 
   ###############################################
   # Default path settings -> WebRTC / WHEP source (when source is WHEP)
