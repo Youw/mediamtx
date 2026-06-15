@@ -266,6 +266,7 @@ type Path struct {
 	// RTP source
 	RTPSDP               string `json:"rtpSDP"`
 	RTPUDPReadBufferSize *uint  `json:"rtpUDPReadBufferSize,omitempty" deprecated:"true"`
+	RTPReorderQueueSize  *uint  `json:"rtpReorderQueueSize"`
 
 	// WHEP source
 	WHEPBearerToken        string   `json:"whepBearerToken"`
@@ -411,6 +412,21 @@ func (pconf Path) Clone() *Path {
 	return &cloned
 }
 
+// checkRTPReorderQueueSize validates the RTP reorder buffer size.
+// A nil value means "use the default"; an explicit zero disables reordering.
+// Any other value must be a power of two (the underlying ring buffer is indexed
+// with a bitmask) and small enough to be tracked with a signed 16-bit offset.
+func checkRTPReorderQueueSize(v *uint) error {
+	if v == nil {
+		return nil
+	}
+	n := *v
+	if n != 0 && (n > 16384 || (n&(n-1)) != 0) {
+		return fmt.Errorf("'rtpReorderQueueSize' must be 0 or a power of two not greater than 16384")
+	}
+	return nil
+}
+
 func (pconf *Path) validate(
 	conf *Conf,
 	name string,
@@ -538,11 +554,21 @@ func (pconf *Path) validate(
 			return fmt.Errorf("`rtpSDP` was not provided")
 		}
 
+		err = checkRTPReorderQueueSize(pconf.RTPReorderQueueSize)
+		if err != nil {
+			return err
+		}
+
 	case strings.HasPrefix(pconf.Source, "unix+rtp://"):
 		l.Log(logger.Warn, "source 'unix+rtp' is deprecated due to intrinsic instability, use 'udp+rtp' instead")
 
 		if pconf.RTPSDP == "" {
 			return fmt.Errorf("`rtpSDP` was not provided")
+		}
+
+		err := checkRTPReorderQueueSize(pconf.RTPReorderQueueSize)
+		if err != nil {
+			return err
 		}
 
 	case strings.HasPrefix(pconf.Source, "srt://"):
